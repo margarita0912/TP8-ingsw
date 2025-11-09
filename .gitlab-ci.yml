@@ -1,0 +1,180 @@
+variables:
+  GO_VERSION: "1.24"
+  FRONTEND_DIR: "ventas-frontend"
+  BACKEND_DIR: "ventas-app"
+
+stages:
+  - build_backend
+  - build_frontend
+  - test_backend
+  - test_frontend
+  - sonarcloud_analysis
+  - e2e_tests
+
+# --------------------------
+# Build backend (Go)
+# --------------------------
+build_backend:
+  stage: build_backend
+  image: golang:${GO_VERSION}
+  script:
+    - cd ${BACKEND_DIR}
+    - go version
+    - go mod tidy
+    - go build -o ../backend-app ./cmd/main.go
+  artifacts:
+    paths:
+      - backend-app
+    expire_in: 1 hour
+
+# --------------------------
+# Build frontend (React - Vite)
+# --------------------------
+build_frontend:
+  stage: build_frontend
+  image: node:20
+  needs:
+    - job: build_backend
+      artifacts: true
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - ${FRONTEND_DIR}/node_modules/
+  script:
+    - cd ${FRONTEND_DIR}
+    - npm ci
+    - npm run build
+  artifacts:
+    paths:
+      - ${FRONTEND_DIR}/dist
+    expire_in: 1 hour
+
+# --------------------------
+# Test backend (Go + cobertura XML)
+# --------------------------
+test_backend:
+  stage: test_backend
+  image: golang:${GO_VERSION}
+  needs:
+    - job: build_backend
+      artifacts: true
+  script:
+    - cd ${BACKEND_DIR}
+    - go version
+    - go mod tidy
+    - echo "Running backend tests with coverage..."
+    - go test ./... -v -coverprofile=coverage.out -covermode=atomic
+    - go tool cover -func=coverage.out
+    - echo "🔄 Instalando gocover-cobertura..."
+    - go install github.com/boumenot/gocover-cobertura@latest
+    - echo "🔄 Generando reporte Cobertura XML..."
+    - gocover-cobertura < coverage.out > coverage.xml
+    - echo "📊 Verificando archivo XML generado..."
+    - ls -la coverage.xml
+    - head -5 coverage.xml
+  artifacts:
+    paths:
+      - ${BACKEND_DIR}/coverage.out
+      - ${BACKEND_DIR}/coverage.xml
+    expire_in: 1 day
+  coverage: '/total:\s+\(statements\)\s+(\d+\.\d+)%/'
+
+# --------------------------
+# Test frontend (Jest)
+# --------------------------
+test_frontend:
+  stage: test_frontend
+  image: node:20
+  needs:
+    - job: build_frontend
+      artifacts: true
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - ${FRONTEND_DIR}/node_modules/
+  script:
+    - cd ${FRONTEND_DIR}
+    - npm ci
+    - echo "Running frontend tests (Jest) with coverage..."
+    - npm test -- --coverage --runInBand --silent --watchAll=false
+  artifacts:
+    paths:
+      - ${FRONTEND_DIR}/coverage/
+    expire_in: 1 day
+  coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
+
+# --------------------------
+# Analisis estatico con SonarCloud
+# --------------------------
+sonarcloud_analysis:
+  stage: sonarcloud_analysis
+  needs:
+    - job: test_backend
+      artifacts: true
+    - job: test_frontend
+      artifacts: true
+  image: sonarsource/sonar-scanner-cli:latest
+  script:
+    - echo "📁 Verificando archivos de coverage disponibles..."
+    - ls -la ${BACKEND_DIR}/ || echo "Backend dir no encontrado"
+    - ls -la ${FRONTEND_DIR}/coverage/ || echo "Frontend coverage dir no encontrado"
+    - echo "🧹 Limpiando archivos .out para evitar conflictos..."
+    - rm -f ${BACKEND_DIR}/coverage.out || true
+    - rm -f ${BACKEND_DIR}/*.out || true
+    - rm -f */coverage.out || true
+    - rm -f **/coverage.out || true
+    - echo "🔍 Listando archivos restantes..."
+    - ls -la ${BACKEND_DIR}/ || true
+    - echo "📊 Verificando coverage XML del backend..."
+    - if [ -f "${BACKEND_DIR}/coverage.xml" ]; then echo "✅ coverage.xml encontrado"; head -3 ${BACKEND_DIR}/coverage.xml || true; else echo "❌ coverage.xml no encontrado"; fi
+    - echo "📊 Verificando coverage LCOV del frontend..."
+    - if [ -f "${FRONTEND_DIR}/coverage/lcov.info" ]; then echo "✅ lcov.info encontrado"; else echo "❌ lcov.info no encontrado"; fi
+    - echo "🔍 Ejecutando análisis de SonarCloud..."
+    - >
+      sonar-scanner
+      -Dsonar.organization=$SONAR_ORG
+      -Dsonar.projectKey=$SONAR_PROJECT_KEY
+      -Dsonar.host.url=https://sonarcloud.io
+      -Dsonar.token=$SONAR_TOKEN
+      -Dsonar.sources=${BACKEND_DIR},${FRONTEND_DIR}/src
+      -Dsonar.go.coverage.reportPaths=${BACKEND_DIR}/coverage.xml
+      -Dsonar.javascript.lcov.reportPaths=${FRONTEND_DIR}/coverage/lcov.info
+      -Dsonar.exclusions=**/node_modules/**,**/vendor/**,**/cypress/**,**/*.test.js,**/*.spec.js
+      -Dsonar.coverage.exclusions=**/*.out
+      -Dsonar.cpd.exclusions=**/coverage/**
+      -Dsonar.coverageReportPaths=""
+      -Dsonar.genericCoverage.disabled=true
+      -Dsonar.verbose=true
+  only:
+    - main
+  allow_failure: true
+
+# --------------------------
+# E2E Tests (Cypress)
+# --------------------------
+e2e_tests:
+  stage: e2e_tests
+  image: node:20
+  needs:
+    - job: build_backend
+      artifacts: true
+    - job: build_frontend
+      artifacts: true
+  before_script:
+    - apt-get update -qq
+    - apt-get install -y -qq libnss3 libgtk-3-0 libxss1 libgconf-2-4 libxrandr2 libasound2 libpangocairo-1.0-0 libatk1.0-0 libcairo-gobject2 libgtk-3-0 libgdk-pixbuf2.0-0
+  script:
+    - cd ${FRONTEND_DIR}
+    - npm ci
+    - echo "Verificando instalacion de Cypress..."
+    - npx cypress version
+    - echo "Cypress setup verificado exitosamente"
+    - echo "Para ejecutar E2E completo, configura servicios de backend/frontend"
+    - echo "Pipeline completado con exito"
+  artifacts:
+    when: always
+    paths:
+      - ${FRONTEND_DIR}/cypress/videos/
+      - ${FRONTEND_DIR}/cypress/screenshots/
+    expire_in: 1 day
+  allow_failure: true
