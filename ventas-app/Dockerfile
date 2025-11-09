@@ -1,27 +1,23 @@
+# ===== Build =====
 FROM golang:1.24-alpine AS build
 WORKDIR /app
 
-# Copiar archivos de dependencias
 COPY go.mod go.sum ./
-
-# Descargar dependencias
 RUN go mod download
 
-# Copiar el resto del código fuente
 COPY . .
 
-# Compilar
+# Compilar binario estático y marcarlo ejecutable
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -trimpath -ldflags="-s -w" -o ventas-app ./cmd/main.go
+    go build -trimpath -ldflags="-s -w" -o /app/ventas-app ./cmd/main.go \
+ && chmod 0755 /app/ventas-app
 
+# ===== Runtime =====
 FROM gcr.io/distroless/base-debian12
 WORKDIR /app
 
-# Copiar binario
-COPY --from=build /app/ventas-app /app/ventas-app
-
-# Copiar plantillas de configuración
-COPY --from=build /app/.env.* ./
+# 👇 Ojo a --chmod y --chown: garantizan permisos para el usuario no root
+COPY --from=build --chown=nonroot:nonroot --chmod=0755 /app/ventas-app /app/ventas-app
 
 ENV PORT=8080
 EXPOSE 8080
