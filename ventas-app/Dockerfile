@@ -20,4 +20,4 @@ COPY --from=build --chown=nonroot:nonroot --chmod=0755 /app/ventas-app /app/vent
 
 USER nonroot:nonroot
 EXPOSE 8080
-ENTRYPOINT ["/app/ventas-app"]
+CMD ["/app/ventas-app"]
