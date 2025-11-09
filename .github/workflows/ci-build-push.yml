@@ -85,8 +85,8 @@ jobs:
       - name: Build backend
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: ventas-app/Dockerfile
+          context: ./ventas-app  # <- Cambiar aquí: usar el directorio del backend como contexto
+          file: ./ventas-app/Dockerfile
           push: false
           load: true
           tags: |
@@ -95,16 +95,16 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Frontend image - agregar load: true
+      # Frontend image
       - name: Build frontend
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: ventas-frontend/Dockerfile
+          context: ./ventas-frontend  # <- También ajustar el frontend para consistencia
+          file: ./ventas-frontend/Dockerfile
           push: false
           load: true
           tags: |
-            ${{ env.IMAGE_FRONT }}:${{ steps.vars.outputs.SHORT_SHA }}
+           ${{ env.IMAGE_FRONT }}:${{ steps.vars.outputs.SHORT_SHA }}
             ${{ env.IMAGE_FRONT }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -118,7 +118,8 @@ jobs:
           docker push ${{ env.IMAGE_FRONT }}:${{ steps.vars.outputs.SHORT_SHA }}
           docker push ${{ env.IMAGE_FRONT }}:latest
 
-  summary:
+  summary: 
+
     needs: build-and-push
     runs-on: ubuntu-latest
     if: always()
