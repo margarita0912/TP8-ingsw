@@ -6,9 +6,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-# Copiar el código y buildear (Vite/CRA deja /dist)
+# Copiar el código y buildear (Vite genera /dist)
 COPY . .
-# Si usás Vite, este comando genera /dist
 RUN npm run build
 
 # ====== Stage 2: runtime (Alpine) ======
@@ -24,9 +23,10 @@ RUN npm i -g serve
 # Copiar artefacto estático
 COPY --from=build /app/dist /app/dist
 
-# Railway/Render setean $PORT; por defecto 3000 local
+# Railway/Render setean $PORT; por defecto 3000
 ENV PORT=3000
 EXPOSE 3000
 
 USER web
-ENTRYPOINT ["serve", "-s", "dist", "-l", "${PORT}"]
+# CAMBIO: Usar CMD con shell para que expanda $PORT
+CMD serve -s dist -l $PORT
