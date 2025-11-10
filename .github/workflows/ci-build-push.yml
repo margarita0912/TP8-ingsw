@@ -31,7 +31,7 @@ jobs:
         run: echo "Using tags - latest and ${{ steps.vars.outputs.BRANCH }}-${{ steps.vars.outputs.SHORT_SHA }}"
 
       - name: Log in to GHCR
-        uses: docker/[email protected]
+        uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -39,12 +39,12 @@ jobs:
 
       # ===== Tests =====
       - name: Set up Go
-        uses: actions/[email protected]
+        uses: actions/setup-go@v4
         with:
           go-version: '1.21'
 
       - name: Set up Node.js
-        uses: actions/[email protected]
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
