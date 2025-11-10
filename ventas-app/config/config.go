@@ -8,24 +8,30 @@ import (
 )
 
 func LoadEnv(env string) {
-	// En producción (Render), usar directamente las variables de entorno
-	if os.Getenv("RENDER") == "true" {
-		log.Println("Ejecutando en Render, usando variables de entorno")
-		setDefaults()
-		return
+	var filename string
+	switch env {
+	case "prod":
+		filename = ".env.prod"
+	case "qa":
+		filename = ".env.qa"
+	default:
+		filename = ".env.qa"
 	}
 
-	// Para desarrollo local, intentar cargar archivo .env según el entorno
-	envFile := ".env"
-	if env != "" {
-		envFile = ".env." + env
-	}
+	// Intentar cargar el archivo .env
+	err := godotenv.Load(filename)
+	if err != nil {
+		// Solo advertir, no fallar - las variables pueden venir del sistema
+		log.Printf("Advertencia: No se pudo cargar %s, usando variables de entorno del sistema: %v", filename, err)
 
-	if err := godotenv.Load(envFile); err != nil {
-		log.Printf("No se encontró %s, intentando .env por defecto\n", envFile)
-		// Intentar cargar .env por defecto si el específico no existe
-		if err := godotenv.Load(); err != nil {
-			log.Println("No se encontró archivo .env, usando variables de entorno del sistema")
+		// Opcional: verificar que las variables críticas existan
+		requiredVars := []string{"DB_HOST", "DB_NAME", "DB_USER", "DB_PASS", "DB_PORT", "PORT"}
+		for _, v := range requiredVars {
+			if os.Getenv(v) == "" {
+				log.Fatalf("Variable de entorno requerida no encontrada: %s", v)
+			}
 		}
+	} else {
+		log.Printf("Archivo %s cargado exitosamente", filename)
 	}
 }
