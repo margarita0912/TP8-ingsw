@@ -3,6 +3,7 @@ package database
 import (
 	"fmt"
 	"log"
+	"os"
 	"ventas-app/models"
 
 	"github.com/joho/godotenv"
@@ -12,19 +13,35 @@ import (
 
 var DBs = make(map[string]*gorm.DB)
 
-// ConnectAll carga las conexiones a QA y PROD desde los archivos .env.qa y .env.prod
+// ConnectAll carga las conexiones a QA y PROD desde los archivos .env o variables del sistema
 func ConnectAll() {
-	// Cargar .env.qa
+	// Intentar cargar .env.qa, si no existe usar variables del sistema
 	envQA, err := godotenv.Read(".env.qa")
 	if err != nil {
-		log.Fatal("❌ Error cargando .env.qa:", err)
+		log.Println("⚠️ Advertencia: No se pudo cargar .env.qa, usando variables del sistema")
+		// Cargar desde variables de entorno del sistema
+		envQA = map[string]string{
+			"DB_HOST": os.Getenv("DB_HOST"),
+			"DB_USER": os.Getenv("DB_USER"),
+			"DB_PASS": os.Getenv("DB_PASS"),
+			"DB_PORT": os.Getenv("DB_PORT"),
+			"DB_NAME": os.Getenv("DB_NAME"),
+		}
 	}
 	DBs["qa"] = connectFromMap(envQA)
 
-	// Cargar .env.prod
+	// Intentar cargar .env.prod, si no existe usar variables del sistema
 	envProd, err := godotenv.Read(".env.prod")
 	if err != nil {
-		log.Fatal("❌ Error cargando .env.prod:", err)
+		log.Println("⚠️ Advertencia: No se pudo cargar .env.prod, usando variables del sistema")
+		// Cargar desde variables de entorno del sistema
+		envProd = map[string]string{
+			"DB_HOST": os.Getenv("DB_HOST"),
+			"DB_USER": os.Getenv("DB_USER"),
+			"DB_PASS": os.Getenv("DB_PASS"),
+			"DB_PORT": os.Getenv("DB_PORT"),
+			"DB_NAME": os.Getenv("DB_NAME"),
+		}
 	}
 	DBs["prod"] = connectFromMap(envProd)
 
