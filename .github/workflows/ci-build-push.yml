@@ -12,23 +12,68 @@ permissions:
 env:
   REGISTRY: ghcr.io
   OWNER: ${{ github.repository_owner }}
-  REPO_LC: tp8-ingsw
+  REPO_LC: tp8-ingsw  # <- en minúscula sí o sí
 
+# ============================
+# JOB 1 - Test backend (Go)
+# ============================
 jobs:
-  build-push:
+  test-back:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ===== Short SHA & tags =====
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Run backend tests
+        working-directory: ventas-app
+        run: |
+          go test ./... -v -coverprofile=coverage.out
+          go tool cover -func=coverage.out
+
+  # ============================
+  # JOB 2 - Test frontend (React)
+  # ============================
+  test-front:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install and test
+        working-directory: ventas-frontend
+        env:
+          CI: true
+        run: |
+          npm ci
+          npm test --if-present -- --coverage
+
+  # ============================
+  # JOB 3 - Build & Push (solo si los tests pasan)
+  # ============================
+  build-and-push:
+    needs: 
+      - test-back
+      - test-front
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Compute tags
         id: vars
         run: |
           echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
           echo "BRANCH=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
-      - name: Show tags
-        run: echo "Using tags - latest and ${{ steps.vars.outputs.BRANCH }}-${{ steps.vars.outputs.SHORT_SHA }}"
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -37,53 +82,43 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # ===== Tests =====
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: 'ventas-frontend/package-lock.json'
-
-      - name: Test backend (Go)
+      # Backend
+      - name: Build backend image
         run: |
-          cd ventas-app
-          go test ./... -v -coverprofile=coverage.out
-          go tool cover -func=coverage.out
+          IMAGE=${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_LC }}-backend
+          docker build -f ./Dockerfile \
+            -t $IMAGE:latest \
+            -t $IMAGE:${{ steps.vars.outputs.BRANCH }}-${{ steps.vars.outputs.SHORT_SHA }} \
+            .
+          echo "IMAGE_BACKEND=$IMAGE" >> $GITHUB_ENV
 
-      - name: Test frontend (React)
-        env:
-          CI: true
+      - name: Push backend image
         run: |
-          cd ventas-frontend
-          npm ci
-          npm test --if-present -- --coverage
+          docker push $IMAGE_BACKEND:latest
+          docker push $IMAGE_BACKEND:${{ steps.vars.outputs.BRANCH }}-${{ steps.vars.outputs.SHORT_SHA }}
 
-      # ===== BACKEND (Go) =====
-      - name: Build and push backend image
-        env:
-          BACKEND_IMAGE: ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_LC }}-backend
+      # Frontend
+      - name: Build frontend image
         run: |
-          docker build -f ./ventas-app/Dockerfile \
-            -t ${BACKEND_IMAGE}:latest \
-            -t ${BACKEND_IMAGE}:${{ steps.vars.outputs.BRANCH }}-${{ steps.vars.outputs.SHORT_SHA }} \
-            ./ventas-app
-          docker push ${BACKEND_IMAGE}:latest
-          docker push ${BACKEND_IMAGE}:${{ steps.vars.outputs.BRANCH }}-${{ steps.vars.outputs.SHORT_SHA }}
+          IMAGE=${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_LC }}-frontend
+          docker build \
+            -f ./ventas-frontend/Dockerfile \
+            -t $IMAGE:latest \
+            -t $IMAGE:${{ steps.vars.outputs.BRANCH }}-${{ steps.vars.outputs.SHORT_SHA }} \
+            ventas-frontend
+          echo "IMAGE_FRONTEND=$IMAGE" >> $GITHUB_ENV
 
-      # ===== FRONTEND (React) =====
-      - name: Build and push frontend image
-        env:
-          FRONTEND_IMAGE: ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_LC }}-frontend
+      - name: Push frontend image
         run: |
-          docker build -f ./ventas-frontend/Dockerfile \
-            -t ${FRONTEND_IMAGE}:latest \
-            -t ${FRONTEND_IMAGE}:${{ steps.vars.outputs.BRANCH }}-${{ steps.vars.outputs.SHORT_SHA }} \
-            ./ventas-frontend
-          docker push ${FRONTEND_IMAGE}:latest
-          docker push ${FRONTEND_IMAGE}:${{ steps.vars.outputs.BRANCH }}-${{ steps.vars.outputs.SHORT_SHA }}
+          docker push $IMAGE_FRONTEND:latest
+          docker push $IMAGE_FRONTEND:${{ steps.vars.outputs.BRANCH }}-${{ steps.vars.outputs.SHORT_SHA }}
+
+  # ============================
+  # JOB 4 - Summary / Status final
+  # ============================
+  summary:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summary done
+        run: echo "CI completo ✅"
