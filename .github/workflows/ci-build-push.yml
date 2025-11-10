@@ -48,14 +48,21 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'ventas-frontend/package-lock.json'
 
-      - name: Install and test
+      - name: Install dependencies
+        working-directory: ventas-frontend
+        run: |
+          npm ci
+          npm install --save-dev @babel/preset-env @babel/preset-react @babel/preset-typescript identity-obj-proxy
+
+      - name: Run tests
         working-directory: ventas-frontend
         env:
           CI: true
-        run: |
-          npm ci
-          npm test --if-present -- --coverage
+          NODE_OPTIONS: --experimental-vm-modules
+        run: npm test -- --coverage --transformIgnorePatterns "node_modules/(?!(msw|@mswjs))/"
 
   # ============================
   # JOB 3 - Build & Push (solo si los tests pasan)
