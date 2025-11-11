@@ -45,7 +45,15 @@ func main() {
 			fmt.Println("⚠️ ALLOWED_ORIGINS vacío, usando default localhost")
 		}
 
-		origins := strings.Split(allowedOrigins, ",")
+		originsRaw := strings.Split(allowedOrigins, ",")
+		// Trim spaces from each origin
+		var origins []string
+		for _, origin := range originsRaw {
+			trimmed := strings.TrimSpace(origin)
+			if trimmed != "" {
+				origins = append(origins, trimmed)
+			}
+		}
 		fmt.Println("🌐 CORS configurado para origins específicos:", origins)
 
 		corsConfig = cors.Config{
