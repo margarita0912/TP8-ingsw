@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 	"ventas-app/config"
 	"ventas-app/database"
 	"ventas-app/routes"
@@ -24,23 +25,40 @@ func main() {
 	// Configuración de CORS dinámica
 	allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
 	fmt.Println("🔧 DEBUG: ALLOWED_ORIGINS env var:", allowedOrigins)
-	if allowedOrigins == "" {
-		// Por defecto para desarrollo local
-		allowedOrigins = "http://localhost:5173,http://localhost:3000"
-		fmt.Println("⚠️ ALLOWED_ORIGINS vacío, usando default localhost")
+	
+	var corsConfig cors.Config
+	
+	if allowedOrigins == "*" {
+		// Modo permisivo para debugging
+		fmt.Println("🌐 CORS configurado en modo PERMISIVO (*)")
+		corsConfig = cors.Config{
+			AllowAllOrigins:  true,
+			AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+			AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Env"},
+			ExposeHeaders:    []string{"Content-Length"},
+			AllowCredentials: false, // No se puede usar con AllowAllOrigins
+			MaxAge:           12 * time.Hour,
+		}
+	} else {
+		if allowedOrigins == "" {
+			allowedOrigins = "http://localhost:5173,http://localhost:3000"
+			fmt.Println("⚠️ ALLOWED_ORIGINS vacío, usando default localhost")
+		}
+		
+		origins := strings.Split(allowedOrigins, ",")
+		fmt.Println("🌐 CORS configurado para origins específicos:", origins)
+		
+		corsConfig = cors.Config{
+			AllowOrigins:     origins,
+			AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+			AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Env"},
+			ExposeHeaders:    []string{"Content-Length"},
+			AllowCredentials: true,
+			MaxAge:           12 * time.Hour,
+		}
 	}
 
-	// Convertir string separado por comas en slice
-	origins := strings.Split(allowedOrigins, ",")
-	fmt.Println("🌐 CORS configurado para origins:", origins)
-
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     origins,
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "X-Env"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-	}))
+	r.Use(cors.New(corsConfig))
 
 	routes.Setup(r)
 
