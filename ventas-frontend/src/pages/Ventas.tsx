@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react'
 import api from '../api/axios'
 
+// Helper para garantizar que lo que iteramos sea un array
+const ensureArray = (v: any): any[] => {
+    if (Array.isArray(v)) return v
+    if (v && Array.isArray(v.data)) return v.data
+    return []
+}
+
 type Producto = {
     id: number
     nombre: string
@@ -34,7 +41,7 @@ export default function Ventas() {
                 setLoading(true)
                 const res = await api.get('/productos')
                 // Normalizamos por si el backend usa otras claves o tipos
-                const normalizados: Producto[] = (res.data || []).map((raw: any) => ({
+                const normalizados: Producto[] = ensureArray(res.data).map((raw: any) => ({
                     id: Number(
                         raw.id ??
                         raw.ID ??
@@ -136,7 +143,7 @@ export default function Ventas() {
 
             // Recargar productos (stock actualizado)
             const resProductos = await api.get('/productos')
-            const normalizados: Producto[] = (resProductos.data || []).map((raw: any) => ({
+            const normalizados: Producto[] = ensureArray(resProductos.data).map((raw: any) => ({
                 id: Number(raw.id ?? raw.ID ?? raw.producto_id ?? raw.productoId),
                 nombre: String(raw.nombre ?? raw.name ?? raw.descripcion ?? 'Sin nombre'),
                 precio: Number(raw.precio ?? raw.price ?? raw.PRECIO ?? 0),
