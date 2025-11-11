@@ -25,9 +25,9 @@ func main() {
 	// Configuración de CORS dinámica
 	allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
 	fmt.Println("🔧 DEBUG: ALLOWED_ORIGINS env var:", allowedOrigins)
-	
+
 	var corsConfig cors.Config
-	
+
 	if allowedOrigins == "*" {
 		// Modo permisivo para debugging
 		fmt.Println("🌐 CORS configurado en modo PERMISIVO (*)")
@@ -44,10 +44,10 @@ func main() {
 			allowedOrigins = "http://localhost:5173,http://localhost:3000"
 			fmt.Println("⚠️ ALLOWED_ORIGINS vacío, usando default localhost")
 		}
-		
+
 		origins := strings.Split(allowedOrigins, ",")
 		fmt.Println("🌐 CORS configurado para origins específicos:", origins)
-		
+
 		corsConfig = cors.Config{
 			AllowOrigins:     origins,
 			AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
