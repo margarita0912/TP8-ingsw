@@ -24,16 +24,10 @@ Sistema de gestión de ventas con arquitectura cliente-servidor, implementando C
 
 ### Frontend
 - **Framework:** React 19.1.1
-- **Lenguaje:** TypeScript 5.9.3
 - **Build Tool:** Vite 7.1.7
-- **HTTP Client:** Axios 1.12.2
-- **Routing:** React Router 7.9.4
-- **Testing:** Jest 30.2.0 + React Testing Library
-- **E2E:** Cypress 15.6.0
 
 ### DevOps & Infraestructura
 - **CI/CD:** GitHub Actions
 - **Container Registry:** GitHub Container Registry (GHCR)
 - **Hosting:** Render.com (Frontend y Backend)
 - **Database:** Railway MySQL
-- **Containerización:** Docker (multi-stage builds)
