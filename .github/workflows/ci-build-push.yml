@@ -184,26 +184,66 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  summary:
+  deploy-qa:
+    name: Deploy to QA
     needs: [build-push-qa]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Deploy Backend QA to Render
+        run: |
+          echo "Deploying backend to QA..."
+          curl -fsSL -X POST "${{ secrets.RENDER_BACK_QA_HOOK }}"
+      
+      - name: Deploy Frontend QA to Render
+        run: |
+          echo "Deploying frontend to QA..."
+          curl -fsSL -X POST "${{ secrets.RENDER_FRONT_QA_HOOK }}"
+      
+      - name: QA Deployment Complete
+        run: echo "✅ QA deployment triggered successfully"
+
+  deploy-prod:
+    name: Deploy to Production
+    needs: [build-push-prod]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://tp8-front-prod-tn48.onrender.com
+    steps:
+      - name: Deploy Backend PROD to Render
+        run: |
+          echo "Deploying backend to Production..."
+          curl -fsSL -X POST "${{ secrets.RENDER_BACK_PROD_HOOK }}"
+      
+      - name: Deploy Frontend PROD to Render
+        run: |
+          echo "Deploying frontend to Production..."
+          curl -fsSL -X POST "${{ secrets.RENDER_FRONT_PROD_HOOK }}"
+      
+      - name: Production Deployment Complete
+        run: echo "✅ Production deployment triggered successfully"
+
+  summary:
+    needs: [build-push-qa, deploy-qa, build-push-prod, deploy-prod]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Job Summary
         run: |
-          echo "## 🚀 Build & Push Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 Build, Push & Deploy Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### QA Images (Automatic)" >> $GITHUB_STEP_SUMMARY
+          echo "### QA Environment" >> $GITHUB_STEP_SUMMARY
           echo "- Backend QA: \`${{ env.IMAGE_BACK }}:qa\`" >> $GITHUB_STEP_SUMMARY
           echo "- Frontend QA: \`${{ env.IMAGE_FRONT }}:qa\`" >> $GITHUB_STEP_SUMMARY
           echo "- Commit: \`${{ needs.build-push-qa.outputs.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Status: ${{ needs.deploy-qa.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "### PROD Images (Manual Deploy)" >> $GITHUB_STEP_SUMMARY
-            echo "- Backend PROD: \`${{ env.IMAGE_BACK }}:prod\`" >> $GITHUB_STEP_SUMMARY
-            echo "- Frontend PROD: \`${{ env.IMAGE_FRONT }}:prod\`" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "✅ **PROD images built successfully!**" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "ℹ️ To deploy to PROD, run this workflow manually (Actions → Run workflow)" >> $GITHUB_STEP_SUMMARY
-          fi
+          echo "### PROD Environment" >> $GITHUB_STEP_SUMMARY
+          echo "- Backend PROD: \`${{ env.IMAGE_BACK }}:prod\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend PROD: \`${{ env.IMAGE_FRONT }}:prod\`" >> $GITHUB_STEP_SUMMARY
+          echo "- URL: https://tp8-front-prod-tn48.onrender.com" >> $GITHUB_STEP_SUMMARY
+          echo "- Status: ${{ needs.deploy-prod.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Pipeline completed!**" >> $GITHUB_STEP_SUMMARY
