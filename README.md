@@ -29,5 +29,5 @@ Sistema de gestión de ventas con arquitectura cliente-servidor, implementando C
 ### DevOps & Infraestructura
 - **CI/CD:** GitHub Actions
 - **Container Registry:** GitHub Container Registry (GHCR)
-- **Hosting:** Render.com (Front y Back)
+- **Hosting:** Render.com (Frontend y Backend)
 - **Database:** Railway MySQL
