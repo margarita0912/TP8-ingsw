@@ -1,87 +1,39 @@
-# VentasTP7DeMarcos-strumia
+# TP8 - Sistema de Ventas con CI/CD
 
-README – TP7: Testing & CI/CD
-# Proyecto
+Sistema de gestión de ventas con arquitectura cliente-servidor, implementando CI/CD completo con ambientes QA y Producción separados.
 
-Sistema de Ventas – Ingeniería de Software III
+## Ambientes Deployados
 
-Aplicación fullstack compuesta por:
+### QA Environment
+- **Backend:** https://tp8-back-qa.onrender.com
+- **Frontend:** https://tp8-front-qa-i491.onrender.com
 
-Backend: Go (Gin + GORM)
+### Production Environment
+- **Backend:** https://tp8-back-prod-svdk.onrender.com
+- **Frontend:** https://tp8-front-prod-tn48.onrender.com
 
-Frontend: React (Vite + TypeScript)
+## Tecnologias usadas
 
-Pipeline CI/CD: GitLab CI
+### Backend
+- **Lenguaje:** Go 1.22+
+- **Framework:** Gin Web Framework
+- **ORM:** GORM
+- **Base de Datos:** MySQL (Railway)
+- **Autenticación:** JWT (golang-jwt/jwt/v5)
+- **CORS:** gin-contrib/cors
 
-Testing: Unitarios, integración, E2E (Cypress), y análisis estático con SonarCloud
+### Frontend
+- **Framework:** React 19.1.1
+- **Lenguaje:** TypeScript 5.9.3
+- **Build Tool:** Vite 7.1.7
+- **HTTP Client:** Axios 1.12.2
+- **Routing:** React Router 7.9.4
+- **Testing:** Jest 30.2.0 + React Testing Library
+- **E2E:** Cypress 15.6.0
 
-# Estructura del pipeline
-
-El pipeline se compone de 6 etapas en orden secuencial:
-
-Etapa	Descripción	Herramienta
-- build_backend	Compila el backend de Go y valida dependencias	Go 1.24
-- build_frontend	Instala dependencias y construye el bundle de React	Node 20
-- test_backend	Ejecuta tests de Go con go test y genera cobertura XML	go test + gocover-cobertura
-- test_frontend	Ejecuta tests de Jest con reporte LCOV	Jest + React Testing Library
-- sonarcloud_analysis	Análisis estático del código y métricas de calidad	SonarCloud
-- e2e_tests	Pruebas de flujo completo sobre el frontend	Cypress
-- Testing
-- Backend (Go)
-
-Se utilizan tests unitarios en el paquete controllers
-
-Cobertura actual: ≈ 94%
-
-Comando local:
-
-go test ./controllers -v -coverprofile=coverage.out
-go tool cover -html=coverage.out
-
-Ver coverage.html o capturas en carpeta de evidencias
-
-
-💻 Frontend (React)
-
-Se usa Jest con --coverage
-
-Cobertura: ≈ 60–70%
-
-Archivos .spec.tsx en src/__tests__/
-
-Ver captura en evidencia
-
-🌐 E2E (Cypress)
-
-Pruebas completas de flujo de ventas: crear, actualizar y validar errores.
-
-Script ejecutado en CI con:
-
-npx cypress run --browser chrome --headless
-
-
-Ver captura en evidencia
-
-☁️ SonarCloud
-
-El análisis verifica:
-
-Duplicaciones
-
-Vulnerabilidades
-
-Smells
-
-Cobertura global combinada Go + React
-
-
-🧩 Pipeline completo
-
-
-📚 Tecnologías clave
-Componente	Tecnología
-Backend	Go 1.24, Gin, GORM
-Frontend	React, Vite, TypeScript
-CI/CD	GitLab CI
-Testing	Go test, Jest, Cypress
-QA	SonarCloud, Cobertura XML/LCOV
+### DevOps & Infraestructura
+- **CI/CD:** GitHub Actions
+- **Container Registry:** GitHub Container Registry (GHCR)
+- **Hosting:** Render.com (Frontend y Backend)
+- **Database:** Railway MySQL
+- **Containerización:** Docker (multi-stage builds)
