@@ -130,9 +130,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-    environment:
-      name: production
-      url: https://tp8-front-prod.onrender.com
     outputs:
       sha: ${{ steps.vars.outputs.SHORT_SHA }}
     steps:
@@ -224,26 +221,3 @@ jobs:
       
       - name: Production Deployment Complete
         run: echo "✅ Production deployment triggered successfully"
-
-  summary:
-    needs: [build-push-qa, deploy-qa, build-push-prod, deploy-prod]
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: Job Summary
-        run: |
-          echo "## 🚀 Build, Push & Deploy Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### QA Environment" >> $GITHUB_STEP_SUMMARY
-          echo "- Backend QA: \`${{ env.IMAGE_BACK }}:qa\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Frontend QA: \`${{ env.IMAGE_FRONT }}:qa\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Commit: \`${{ needs.build-push-qa.outputs.sha }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Status: ${{ needs.deploy-qa.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### PROD Environment" >> $GITHUB_STEP_SUMMARY
-          echo "- Backend PROD: \`${{ env.IMAGE_BACK }}:prod\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Frontend PROD: \`${{ env.IMAGE_FRONT }}:prod\`" >> $GITHUB_STEP_SUMMARY
-          echo "- URL: https://tp8-front-prod-tn48.onrender.com" >> $GITHUB_STEP_SUMMARY
-          echo "- Status: ${{ needs.deploy-prod.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ **Pipeline completed!**" >> $GITHUB_STEP_SUMMARY
