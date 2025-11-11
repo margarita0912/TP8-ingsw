@@ -1,8 +1,15 @@
 import { useEffect, useState } from 'react'
 import api from '../api/axios'
 
+interface Producto {
+    id: number
+    nombre: string
+    precio: number
+    stock: number
+}
+
 export default function Productos() {
-    const [productos, setProductos] = useState([])
+    const [productos, setProductos] = useState<Producto[]>([])
 
     useEffect(() => {
         api.get('/productos')
@@ -23,7 +30,7 @@ export default function Productos() {
         <div>
             <h2>📦 Productos</h2>
             <ul>
-                {productos.map((p: any) => (
+                {productos.map((p) => (
                     <li key={p.id}>
                         {p.nombre} — ${p.precio} — Stock: {p.stock}
                     </li>

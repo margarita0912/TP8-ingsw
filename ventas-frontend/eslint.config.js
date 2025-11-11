@@ -21,11 +21,19 @@ export default defineConfig([
     },
   },
   {
-    // Specific rules for test files
-    files: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}', 'setupTests.js', 'cypress/**/*.ts'],
+    // Specific rules for test files and mocks
+    files: [
+      '**/*.test.{ts,tsx,js}', 
+      '**/*.spec.{ts,tsx,js}', 
+      'setupTests.js', 
+      'cypress/**/*.ts',
+      'src/mocks/**/*.js',
+      'src/mocks/**/*.ts'
+    ],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-var-requires': 'off',
+      '@typescript-eslint/no-namespace': 'off',
     },
   },
 ])

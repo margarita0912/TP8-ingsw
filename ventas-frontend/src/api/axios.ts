@@ -23,12 +23,9 @@ api.interceptors.request.use((config) => {
         // Only log when baseURL is not configured to avoid noise in prod
         if (!import.meta.env.VITE_API_URL) {
             console.error('VITE_API_URL is not set. Requests will be sent to same origin. Final request URL:', finalUrl)
-        } else {
-            // Optional debug log; comment out if too verbose
-            // console.debug('Request ->', finalUrl)
         }
-    } catch (e) {
-        // ignore
+    } catch {
+        // ignore errors in URL construction
     }
 
     return config
