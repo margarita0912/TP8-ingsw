@@ -5,8 +5,8 @@ export {}
 declare global {
   namespace Cypress {
     interface Chainable {
-      login(email: string, password: string): Chainable<any>
-      addProductToCart(productId: number, quantity: number, discount?: number): Chainable<any>
+      login(email: string, password: string): Chainable<void>
+      addProductToCart(productId: number, quantity: number, discount?: number): Chainable<void>
     }
   }
 }

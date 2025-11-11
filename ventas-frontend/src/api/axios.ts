@@ -10,15 +10,11 @@ api.interceptors.request.use((config) => {
     const entorno = localStorage.getItem('entorno') || 'qa'
     const token = localStorage.getItem('token')
 
-    // aseguremos headers definidos (TS-safe)
-    config.headers = config.headers || {}
-
-    // tu header de entorno
-    ;(config.headers as any)['X-Env'] = entorno
-
+    // Set headers with proper typing
+    config.headers.set('X-Env', entorno)
 
     if (token) {
-        ;(config.headers as any)['Authorization'] = `Bearer ${token}`
+        config.headers.set('Authorization', `Bearer ${token}`)
     }
 
     // Debug: log the final request URL when baseURL may be missing

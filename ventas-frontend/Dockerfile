@@ -33,5 +33,5 @@ ENV PORT=3000
 EXPOSE 3000
 
 USER web
-# CAMBIO: Usar CMD con shell para que expanda $PORT
-CMD serve -s dist -l $PORT
+# Use JSON format for CMD to handle signals properly
+CMD ["sh", "-c", "serve -s dist -l $PORT"]

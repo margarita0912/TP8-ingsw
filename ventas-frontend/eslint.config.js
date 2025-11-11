@@ -20,4 +20,12 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // Specific rules for test files
+    files: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}', 'setupTests.js', 'cypress/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-var-requires': 'off',
+    },
+  },
 ])
