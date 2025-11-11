@@ -23,13 +23,16 @@ func main() {
 
 	// Configuración de CORS dinámica
 	allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
+	fmt.Println("🔧 DEBUG: ALLOWED_ORIGINS env var:", allowedOrigins)
 	if allowedOrigins == "" {
 		// Por defecto para desarrollo local
 		allowedOrigins = "http://localhost:5173,http://localhost:3000"
+		fmt.Println("⚠️ ALLOWED_ORIGINS vacío, usando default localhost")
 	}
 
 	// Convertir string separado por comas en slice
 	origins := strings.Split(allowedOrigins, ",")
+	fmt.Println("🌐 CORS configurado para origins:", origins)
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     origins,
