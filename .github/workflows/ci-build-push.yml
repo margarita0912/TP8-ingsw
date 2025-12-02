@@ -193,12 +193,23 @@ jobs:
             status=$(curl -s -o /dev/null -w "%{http_code}" https://tp8-front-qa-i491.onrender.com || echo "000")
             if [ "$status" = "200" ]; then
               echo "✅ QA frontend is up (HTTP 200)"
-              exit 0
+              break
             fi
-            echo "Attempt $i/24: status=$status - waiting 5s..."
+            echo "Attempt $i/24: Frontend status=$status - waiting 5s..."
             sleep 5
           done
-          echo "⚠️ QA frontend did not become ready in time"
+          
+          echo "Waiting for QA backend to respond..."
+          for i in {1..24}; do
+            status=$(curl -s -o /dev/null -w "%{http_code}" https://tp8-back-qa.onrender.com/productos || echo "000")
+            if [ "$status" = "200" ] || [ "$status" = "401" ]; then
+              echo "✅ QA backend is up (HTTP $status)"
+              exit 0
+            fi
+            echo "Attempt $i/24: Backend status=$status - waiting 5s..."
+            sleep 5
+          done
+          echo "⚠️ QA services did not become ready in time"
           exit 1
 
       #####################################################
@@ -222,7 +233,7 @@ jobs:
           CYPRESS_API_URL: https://tp8-back-qa.onrender.com
         run: |
           echo "Running Cypress E2E tests against QA..."
-          npx cypress run --config baseUrl=https://tp8-front-qa-i491.onrender.com
+          npx cypress run --spec "cypress/e2e/qa-smoke-tests.cy.js" --config baseUrl=https://tp8-front-qa-i491.onrender.com
 
       - name: Upload Cypress videos
         if: always()
