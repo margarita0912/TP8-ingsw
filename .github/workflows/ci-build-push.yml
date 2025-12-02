@@ -1,14 +1,14 @@
-name: CI - Test, Build & Push to GHCR
+name: CI/CD Pipeline
 
 on:
   push:
     branches: [ "main" ]
-  pull_request:
   workflow_dispatch:
 
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+permissions:
+  contents: read
+  packages: write
+  checks: write
 
 env:
   REGISTRY: ghcr.io
@@ -16,63 +16,84 @@ env:
   IMAGE_FRONT: ghcr.io/${{ github.repository_owner }}/tp8-ingsw-front
 
 jobs:
-  test-back:
+  unit_tests:
+    name: Unit Tests & Code Analysis
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      #################################################
+      ## ---------- BACKEND Setup & Tests ---------- ##
+      #################################################
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
           go-version: '1.22.x'
           cache: true
-      - name: Backend tests
+
+      - name: Test backend with coverage
         working-directory: ./ventas-app
         run: |
           go test -v ./... -coverprofile=coverage.out
           go tool cover -func=coverage.out | tail -n 1
-      - name: Upload coverage
+
+      - name: Upload backend coverage
         uses: actions/upload-artifact@v4
         with:
           name: backend-coverage
           path: ventas-app/coverage.out
 
-  test-front:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      ##################################################
+      ## ---------- FRONTEND Setup & Tests ---------- ##
+      ##################################################
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: ventas-frontend/package-lock.json
-      - name: Install
+
+      - name: Install frontend dependencies
         working-directory: ./ventas-frontend
         run: npm ci
+
       - name: Typecheck
         working-directory: ./ventas-frontend
-        run: npm run typecheck --if-present || npx tsc --noEmit
+        run: npm run typecheck
+
       - name: Lint
         working-directory: ./ventas-frontend
         run: npm run lint --if-present || echo "no lint script"
-      - name: Unit tests
+
+      - name: Test frontend with coverage
         working-directory: ./ventas-frontend
         env:
           CI: true
-        run: npm test --if-present || echo "no tests"
+        run: npm test -- --coverage
+
       - name: Build (ensures prod build passes)
         working-directory: ./ventas-frontend
         run: npm run build
 
-  build-push-qa:
-    name: Build & Push QA Images
-    needs: [test-back, test-front]
+      - name: Tests Complete
+        run: |
+          echo "✅ All unit tests passed!"
+          echo "### 🧪 Unit Tests" >> $GITHUB_STEP_SUMMARY
+          echo "- Backend: Go tests completed" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend: Jest tests completed" >> $GITHUB_STEP_SUMMARY
+
+  build_and_push_images:
+    name: Build & Push Docker Images
+    needs: unit_tests
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     outputs:
       sha: ${{ steps.vars.outputs.SHORT_SHA }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set short SHA
         id: vars
@@ -84,11 +105,14 @@ jobs:
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ secrets.GHCR_USER }}
           password: ${{ secrets.GHCR_TOKEN }}
 
-      - name: Build & Push Backend QA
+      #########################################
+      ## ---------- BACKEND Image ---------- ##
+      #########################################
+      - name: Build & Push Backend
         uses: docker/build-push-action@v6
         with:
           context: ./ventas-app
@@ -104,7 +128,10 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build & Push Frontend QA
+      ##########################################
+      ## ---------- FRONTEND Image ---------- ##
+      ##########################################
+      - name: Build & Push Frontend
         uses: docker/build-push-action@v6
         with:
           context: ./ventas-frontend
@@ -122,9 +149,106 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  build-push-prod:
+      - name: Images Built Successfully
+        run: |
+          echo "✅ Docker images built and pushed!"
+          echo "### 🐳 Docker Images" >> $GITHUB_STEP_SUMMARY
+          echo "- Backend: \`${{ env.IMAGE_BACK }}:${{ steps.vars.outputs.SHORT_SHA }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend: \`${{ env.IMAGE_FRONT }}:${{ steps.vars.outputs.SHORT_SHA }}\`" >> $GITHUB_STEP_SUMMARY
+
+  deploy_qa:
+    name: Deploy to QA
+    needs: build_and_push_images
+    runs-on: ubuntu-latest
+    environment:
+      name: qa
+      url: https://tp8-front-qa-i491.onrender.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      ########################################
+      ## ---------- DEPLOY to QA ---------- ##
+      ########################################
+      - name: Deploy Backend QA to Render
+        run: |
+          echo "Deploying backend to QA..."
+          curl -fsSL -X POST "${{ secrets.RENDER_BACK_QA_HOOK }}"
+      
+      - name: Deploy Frontend QA to Render
+        run: |
+          echo "Deploying frontend to QA..."
+          curl -fsSL -X POST "${{ secrets.RENDER_FRONT_QA_HOOK }}"
+      
+      - name: QA Deployment Complete
+        run: |
+          echo "✅ QA deployment triggered successfully"
+          echo "### 🚀 QA Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "[View QA Frontend](https://tp8-front-qa-i491.onrender.com/)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Wait for QA to be ready
+        run: |
+          echo "Waiting for QA frontend to respond..."
+          for i in {1..24}; do
+            status=$(curl -s -o /dev/null -w "%{http_code}" https://tp8-front-qa-i491.onrender.com || echo "000")
+            if [ "$status" = "200" ]; then
+              echo "✅ QA frontend is up (HTTP 200)"
+              exit 0
+            fi
+            echo "Attempt $i/24: status=$status - waiting 5s..."
+            sleep 5
+          done
+          echo "⚠️ QA frontend did not become ready in time"
+          exit 1
+
+      #####################################################
+      ## ---------- CYPRESS Integration Tests ---------- ##
+      #####################################################
+      - name: Setup Node for Cypress
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: ventas-frontend/package-lock.json
+
+      - name: Install frontend dependencies (for Cypress)
+        working-directory: ./ventas-frontend
+        run: npm ci
+
+      - name: Run Cypress integration tests against QA
+        working-directory: ./ventas-frontend
+        env:
+          CYPRESS_BASE_URL: https://tp8-front-qa-i491.onrender.com
+          CYPRESS_API_URL: https://tp8-back-qa.onrender.com
+        run: |
+          echo "Running Cypress E2E tests against QA..."
+          npx cypress run --config baseUrl=https://tp8-front-qa-i491.onrender.com
+
+      - name: Upload Cypress videos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-videos-qa
+          path: ventas-frontend/cypress/videos
+          retention-days: 7
+
+      - name: Upload Cypress screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-screenshots-qa
+          path: ventas-frontend/cypress/screenshots
+          retention-days: 7
+
+      - name: Cypress Tests Complete
+        if: always()
+        run: |
+          echo "### 🧪 Cypress E2E Tests" >> $GITHUB_STEP_SUMMARY
+          echo "Integration tests executed against QA environment" >> $GITHUB_STEP_SUMMARY
+
+  build_and_push_prod:
     name: Build & Push PROD Images
-    needs: [test-back, test-front]
+    needs: deploy_qa
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
@@ -181,33 +305,17 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy-qa:
-    name: Deploy to QA
-    needs: [build-push-qa]
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    steps:
-      - name: Deploy Backend QA to Render
-        run: |
-          echo "Deploying backend to QA..."
-          curl -fsSL -X POST "${{ secrets.RENDER_BACK_QA_HOOK }}"
-      
-      - name: Deploy Frontend QA to Render
-        run: |
-          echo "Deploying frontend to QA..."
-          curl -fsSL -X POST "${{ secrets.RENDER_FRONT_QA_HOOK }}"
-      
-      - name: QA Deployment Complete
-        run: echo "✅ QA deployment triggered successfully"
-
-  deploy-prod:
+  deploy_prod:
     name: Deploy to Production
-    needs: [build-push-prod]
+    needs: build_and_push_prod
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment:
       name: production
       url: https://tp8-front-prod-tn48.onrender.com
+    
+    ##########################################
+    ## ---------- DEPLOY to PROD ---------- ##
+    ##########################################
     steps:
       - name: Deploy Backend PROD to Render
         run: |
@@ -220,4 +328,7 @@ jobs:
           curl -fsSL -X POST "${{ secrets.RENDER_FRONT_PROD_HOOK }}"
       
       - name: Production Deployment Complete
-        run: echo "✅ Production deployment triggered successfully"
+        run: |
+          echo "✅ Production deployment triggered successfully"
+          echo "### 🎉 Production Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "[View Production](https://tp8-front-prod-tn48.onrender.com/)" >> $GITHUB_STEP_SUMMARY
